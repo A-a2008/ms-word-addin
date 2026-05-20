@@ -24,9 +24,11 @@
     </div>
 
     <script>
-        // 1. YOUR API KEY & THE EXACT BASE ENDPOINT YOU REQUESTED
-        const API_KEY = "s2_c2f10742455f4a21a093e3b8dfe6fd38"; 
-        const ENDPOINT = "https://api.abacus.ai/api/v0"; // Standard OpenAI format path on Abacus v0
+        // Paste your standard Abacus API Key here
+        const API_KEY = "YOUR_ABACUS_API_KEY"; 
+        
+        // This is the direct RouteLLM universal endpoint provided by Abacus
+        const ENDPOINT = "https://routellm.abacus.ai/v1/chat/completions"; 
 
         Office.onReady();
 
@@ -36,13 +38,12 @@
             const text = inputEl.value.trim();
             if (!text) return;
 
-            // Display user message
+            // Show user text in the UI immediately
             chatBox.innerHTML += `<div class="user"><b>You:</b> ${text}</div>`;
             inputEl.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
             try {
-                // 2. STANDARD OPENAI-STYLE CHAT REQUEST
                 const response = await fetch(ENDPOINT, {
                     method: 'POST',
                     headers: {
@@ -50,21 +51,29 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: "abacus-standard", // Default universal routing model text
+                        model: "route-llm", // The universal default model handler
                         messages: [
                             { role: "user", content: text }
                         ]
                     })
                 });
 
-                const data = await response.json();
+                // Read response text directly if JSON parsing fails to avoid token errors
+                const rawText = await response.text();
                 
-                // Read the standard completions response structure
-                if (data.choices && data.choices[0] && data.choices[0].message) {
-                    const botReply = data.choices[0].message.content;
-                    chatBox.innerHTML += `<div class="bot"><b>Abacus:</b> ${botReply}</div>`;
-                } else {
-                    chatBox.innerHTML += `<div style="color:red;"><b>Error:</b> Unexpected response structure from API.</div>`;
+                try {
+                    const data = JSON.parse(rawText);
+                    if (data.choices && data.choices[0] && data.choices[0].message) {
+                        const botReply = data.choices[0].message.content;
+                        chatBox.innerHTML += `<div class="bot"><b>Abacus:</b> ${botReply}</div>`;
+                    } else if (data.error) {
+                        chatBox.innerHTML += `<div style="color:red;"><b>Abacus Error:</b> ${data.error.message || data.error}</div>`;
+                    } else {
+                        chatBox.innerHTML += `<div style="color:red;"><b>Error:</b> Structure unrecognized.</div>`;
+                    }
+                } catch(e) {
+                    // If it still returns HTML or an unparseable format, print it out directly to see why
+                    chatBox.innerHTML += `<div style="color:red;"><b>Raw Response Error:</b> ${rawText.substring(0, 150)}...</div>`;
                 }
                 
             } catch (err) {
